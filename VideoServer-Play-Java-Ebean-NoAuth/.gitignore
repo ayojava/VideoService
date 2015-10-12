@@ -23,7 +23,6 @@ build/
 /.settings
 /RUNNING_PID
 
-
 logs
 target/
 .cache
@@ -35,7 +34,8 @@ lib_managed/
 src_managed/
 .scala_dependencies
 .worksheet
-/activator*
+
+!activator-launch-*.jar
 
 videos/
 videos.tmp/
