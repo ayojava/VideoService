@@ -1,7 +1,7 @@
 package videosvc.test;
 
+import org.junit.*;
 import videosvc.controllers.WebApplication;
-import org.junit.Test;
 import play.Logger;
 import play.mvc.Result;
 import play.test.WithApplication;
@@ -16,13 +16,33 @@ import static play.test.Helpers.route;
 
 public class WebApplicationTest extends WithApplication {
 
-    private final Logger.ALogger l = Logger.of(getClass());
+    private static final Logger.ALogger l = Logger.of(WebApplicationTest.class);
+
+
+    @BeforeClass
+    public static void beforeClass() {
+
+        l.info("=======> Running " + WebApplicationTest.class.getSimpleName());
+    }
+
+    @AfterClass
+    public static void afterClass() {
+        l.info("<======= Terminated " + WebApplicationTest.class.getName() + "\n");
+    }
+
+    @Before
+    public void before() {
+    }
+
+    @After
+    public void after() {
+    }
 
 
     @Test
     public void renderTemplate() {
 
-        l.debug("---> Testing rendering template videosvc.views.html.index");
+        l.info("---> Testing rendering template videosvc.views.html.index");
 
         Content html = videosvc.views.html.index.render("Your new application is ready.");
         assertEquals("text/html", contentType(html));
@@ -32,7 +52,7 @@ public class WebApplicationTest extends WithApplication {
     @Test
     public void testIndex() {
 
-        l.debug("---> Testing Action index()");
+        l.info("---> Testing Action index()");
 
         Result result = new WebApplication().index();
         assertEquals(OK, result.status());
@@ -42,9 +62,9 @@ public class WebApplicationTest extends WithApplication {
     }
 
     @Test
-    public void testCallIndex() {
+    public void testRouteToIndex() {
 
-        l.debug("---> Testing reverse route of Action index()");
+        l.info("---> Testing reverse route of Action index()");
 
         Result result = route(videosvc.controllers.routes.WebApplication.index());
         assertEquals(OK, result.status());

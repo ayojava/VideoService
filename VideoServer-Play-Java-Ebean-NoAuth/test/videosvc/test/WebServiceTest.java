@@ -1,34 +1,27 @@
 package videosvc.test;
 
-import java.io.*;
-import java.util.*;
-import java.util.List;
-
 import com.fasterxml.jackson.databind.JsonNode;
+import org.apache.commons.io.IOUtils;
+import org.junit.*;
+import play.Logger;
+import play.core.j.JavaResultExtractor;
+import play.libs.Json;
+import play.mvc.Http;
+import play.mvc.Result;
+import play.test.WithApplication;
 import videosvc.controllers.WebService;
 import videosvc.models.AverageVideoRating;
 import videosvc.models.Video;
-import org.apache.commons.io.IOUtils;
-import org.junit.*;
-
-import play.Logger;
-import play.api.mvc.*;
-import play.core.j.JavaResultExtractor;
-import play.libs.Json;
-import play.libs.Scala;
-import play.mvc.*;
-import play.mvc.Result;
-import play.test.*;
-import scala.Tuple2;
-import scala.collection.Seq;
-import scala.collection.immutable.Map;
-import scala.collection.immutable.HashMap;
-import scala.collection.immutable.Nil$;
 import videosvc.util.TestUtils;
 import videosvc.utils.U;
 
-import static play.test.Helpers.*;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Iterator;
+
 import static org.junit.Assert.*;
+import static play.test.Helpers.*;
 
 
 /**
@@ -39,13 +32,32 @@ import static org.junit.Assert.*;
 */
 public class WebServiceTest extends WithApplication {
 
-    private final Logger.ALogger l = Logger.of(getClass());
+    private static final Logger.ALogger l = Logger.of(WebServiceTest.class);
+
+
+    @BeforeClass
+    public static void beforeClass() {
+        l.info("=======> Running " + WebServiceTest.class.getName());
+    }
+
+    @AfterClass
+    public static void afterClass() {
+        l.info("<======= Terminated " + WebServiceTest.class.getName() + "\n");
+    }
+
+    @Before
+    public void before() {
+    }
+
+    @After
+    public void after() {
+    }
 
 
     @Test
     public void testFindAll() {
 
-        l.debug("---> Testing Action findAll()");
+        l.info("---> Testing Action findAll()");
 
         // insert test videos into DB
         //
@@ -102,7 +114,7 @@ public class WebServiceTest extends WithApplication {
     @Test
     public void testFindById() {
 
-        l.debug("---> Testing Action findById()");
+        l.info("---> Testing Action findById()");
 
         // insert test videos into DB
         //
@@ -136,7 +148,7 @@ public class WebServiceTest extends WithApplication {
     @Test
     public void testDeleteById() {
 
-        l.debug("---> Testing Action deleteById()");
+        l.info("---> Testing Action deleteById()");
 
         // insert test videos into DB
         //
@@ -208,7 +220,7 @@ Content-Transfer-Encoding: binary
     @Test
     public void testAddVideo() throws IOException {
 
-        l.debug("---> Testing Actions addVideo() and getVideoData()");
+        l.info("---> Testing Actions addVideo() and getVideoData()");
 
         Video videoToAdd = new Video("Bob", "Video of Bob 1", 10L);
         String videoDataFile = "testVideos/video1.mp4";
@@ -302,7 +314,7 @@ Content-Transfer-Encoding: binary
     @Test
     public void testAddAndGetVideoRating() {
 
-        l.debug("---> Testing Actions addVideoRating() and getVideoRating()");
+        l.info("---> Testing Actions addVideoRating() and getVideoRating()");
 
         Video videoToAdd = new Video("Bob", "Video of Bob 1", 10L);
         l.debug("videoToAdd = " + videoToAdd);
@@ -349,12 +361,12 @@ Content-Transfer-Encoding: binary
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+/*
     // does not work in Play 2.4
     // @Test
     public void testAddVideo_NOTWORKING() {
 
-        l.debug("---> Testing Action addVideo()");
+        l.info("---> Testing Action addVideo()");
 
         Video videoToAdd = new Video("Bob", "Video of Bob 1", 10L);
         l.debug("videoToAdd = " + videoToAdd);
@@ -376,7 +388,7 @@ Content-Transfer-Encoding: binary
         AnyContent anyContent = new AnyContentAsMultipartFormData(formData);
         l.debug(anyContent.toString());
 
-        Tuple2 t = new Tuple2("content-type", "multipart/form-data");
+        Tuple2<String, String> t = new Tuple2<>("content-type", "multipart/form-data");
         scala.collection.immutable.List l = Nil$.MODULE$.$colon$colon((Tuple2) t);
         Headers headers = new Headers(l);
         play.api.test.FakeRequest fakeRequest = new play.api.test.FakeRequest(POST, "http://localhost:9000/video", headers, anyContent, null, null, 666, null, false);
@@ -432,4 +444,5 @@ Content-Transfer-Encoding: binary
     private MultipartFormData.FilePart<play.api.libs.Files.TemporaryFile> filePart(String key, String contentType, String filePath) {
         return new MultipartFormData.FilePart<>(key, filePath, Scala.Option(contentType), new play.api.libs.Files.TemporaryFile(new File(filePath)));
     }
+    */
 }

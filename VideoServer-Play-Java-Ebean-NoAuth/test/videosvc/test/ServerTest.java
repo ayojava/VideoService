@@ -30,7 +30,27 @@ import static play.test.Helpers.*;
 
 public class ServerTest extends WithServer {
 
-    private final Logger.ALogger l = Logger.of(getClass());
+    private static final Logger.ALogger l = Logger.of(ServerTest.class);
+
+
+    @BeforeClass
+    public static void beforeClass() {
+
+        l.info("=======> Running " + ServerTest.class.getSimpleName());
+    }
+
+    @AfterClass
+    public static void afterClass() {
+        l.info("<======= Terminated " + ServerTest.class.getName() + "\n");
+    }
+
+    @Before
+    public void before() {
+    }
+
+    @After
+    public void after() {
+    }
 
 
     private static int TIMEOUT = 5000;
@@ -70,7 +90,7 @@ public class ServerTest extends WithServer {
     // @Test
     public void testAddVideo_NOTWORKING() {
 
-        l.debug("---> Testing Action addVideo()");
+        l.info("---> Testing Action addVideo()");
 
         Video videoToAdd = new Video("Bob", "Video of Bob 1", 10L);
         l.debug("videoToAdd = " + videoToAdd);
@@ -99,7 +119,7 @@ public class ServerTest extends WithServer {
     @Test
     public void testAll() throws IOException {
 
-        l.debug("---> Testing all Actions ...");
+        l.info("---> Testing all Actions ...");
 
         Video videoToAdd = new Video("Bob", "Video of Bob 1", 10L);
         String videoDataFile = "testVideos/video1.mp4";
@@ -152,6 +172,8 @@ public class ServerTest extends WithServer {
 
     private Video testUploadVideo(Video v, String videoDataFile) {
 
+        l.info("-----> testUploadVideo(" + v + ", " + videoDataFile + ")");
+
         Result result = sendAddVideoRequest(v, videoDataFile);
 
         assertEquals(OK, result.status());
@@ -166,6 +188,8 @@ public class ServerTest extends WithServer {
 
     private void testDownloadedEqualsUploaded(Video v, String videoDataFile) throws IOException {
 
+        l.info("-----> testDownloadedEqualsUploaded(" + v + ")");
+
         Result result = new WebService().getVideoData(v.id);
 
         assertEquals(OK, result.status());
@@ -178,6 +202,8 @@ public class ServerTest extends WithServer {
 
     private void testNonExistingVideoNotFound() {
 
+        l.info("-----> testDataOfNonExistingVideoNotFound()");
+
         Result result = new WebService().getVideoData(TestUtils.getInvalidVideoId());
 
         assertEquals(NOT_FOUND, result.status());
@@ -185,13 +211,17 @@ public class ServerTest extends WithServer {
 
     private void testIsVideoInVideoList(Video v) {
 
+        l.info("-----> testIsVideoInVideoList(" + v + ")");
+
         WSResponse response = GET("/video");
         assertEquals(OK, response.getStatus());
 
         assertTrue(videoIsInList(toVideoList(response.asJson()), v));
     }
 
-    private void testAddRating(Long videoId, int newRating, double expectedRating, int exspectedTotal) {
+    private void testAddRating(Long videoId, int newRating, double expectedRating, int expectedTotal) {
+
+        l.info("-----> testAddRating(" + videoId + ", " + newRating + ", " + expectedRating + ", " + expectedTotal + ")");
 
         WSResponse response = POST("/video/" + videoId + "/rating/" + newRating, "");
 
@@ -206,17 +236,21 @@ public class ServerTest extends WithServer {
 
         assertTrue(rating.videoId == videoId);
         assertTrue(rating.rating == expectedRating);
-        assertTrue(rating.totalRatings == exspectedTotal);
+        assertTrue(rating.totalRatings == expectedTotal);
     }
 
     private void testAddRatingForNonExistingVideo(Long videoId, int newRating) {
+
+        l.info("-----> testAddRatingForNonExistingVideo(" + videoId + ", " + newRating + ")");
 
         WSResponse response = POST("/video/" + videoId + "/rating/" + newRating, "");
 
         assertEquals(NOT_FOUND, response.getStatus());
     }
 
-    private void testGetRating(Long videoId, double expectedRating, int exspectedTotal) {
+    private void testGetRating(Long videoId, double expectedRating, int expectedTotal) {
+
+        l.info("-----> testGetRating(" + videoId + ", " + expectedRating + ", " + expectedTotal + ")");
 
         WSResponse response = GET("/video/" + videoId + "/rating");
 
@@ -231,10 +265,12 @@ public class ServerTest extends WithServer {
 
         assertTrue(rating.videoId == videoId);
         assertTrue(rating.rating == expectedRating);
-        assertTrue(rating.totalRatings == exspectedTotal);
+        assertTrue(rating.totalRatings == expectedTotal);
     }
 
     private void testGetRatingForNonExistingVideo(Long videoId) {
+
+        l.info("-----> testGetRatingForNonExistingVideo(" + videoId + ")");
 
         WSResponse response = POST("/video/" + videoId + "/rating", "");
 
@@ -243,6 +279,8 @@ public class ServerTest extends WithServer {
 
     private void testGetAll(int expectedCount) {
 
+        l.info("-----> testGetAll(" + expectedCount + ")");
+
         WSResponse response = GET("/video");
         assertEquals(OK, response.getStatus());
 
@@ -250,6 +288,8 @@ public class ServerTest extends WithServer {
     }
 
     private void testGetById(Video compareVideo) {
+
+        l.info("-----> testGetById(" + compareVideo + ")");
 
         WSResponse response = GET("/video/" + compareVideo.id);
         assertEquals(OK, response.getStatus());
@@ -261,11 +301,15 @@ public class ServerTest extends WithServer {
 
     private void testGetByNonExistingId(Long id) {
 
+        l.info("-----> testGetByNonExistingId(" + id + ")");
+
         WSResponse response = GET("/video/" + id);
         assertEquals(NOT_FOUND, response.getStatus());
     }
 
     private void testDeleteById(Long id) {
+
+        l.info("-----> testDeleteById(" + id + ")");
 
         WSResponse response = DELETE("/video/" + id);
         assertEquals(OK, response.getStatus());
@@ -278,6 +322,8 @@ public class ServerTest extends WithServer {
     }
 
     private void testDeleteByNonExistingId(Long id) {
+
+        l.info("-----> testDeleteByNonExistingId(" + id + ")");
 
         WSResponse response = DELETE("/video/" + id);
         assertEquals(NOT_FOUND, response.getStatus());

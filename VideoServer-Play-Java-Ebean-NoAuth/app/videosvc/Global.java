@@ -20,17 +20,17 @@ public class Global extends GlobalSettings {
 
     @Override
     public void beforeStart(Application app) {
-        l.info("===> WebService starting up ...");
+        l.debug("===> WebService starting up ...");
     }
 
     @Override
     public void onStart(Application app) {
-        l.info("===> WebService has started");
+        l.debug("===> WebService has started");
     }
 
     @Override
     public void onStop(Application app) {
-        l.info("<=== WebService shutting down ...\n");
+        l.debug("<=== WebService shutting down ...\n");
     }
 
     @Override
@@ -44,7 +44,7 @@ public class Global extends GlobalSettings {
     public Action onRequest(Http.Request request, Method actionMethod) {
 
         String paramList = parameterList(actionMethod);
-        l.info("---> Request (" + request.method() + " " + request.path() + ") => "
+        l.debug("---> Request (" + request.method() + " " + request.path() + ") => "
                 + actionMethod.getName() + "(" + paramList + ")");
 
         showRequestForAddVideo(request, actionMethod);
@@ -65,7 +65,7 @@ public class Global extends GlobalSettings {
             String key = header.getKey();
             String[] values = header.getValue();
             for (String value : values) {
-                l.info("HEADER - " + key + ": " + value);
+                l.debug("HEADER - " + key + ": " + value);
             }
         }
 //        request.headers().entrySet().forEach(hs -> {
