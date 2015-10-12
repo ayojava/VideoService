@@ -1,36 +1,27 @@
 package videosvc.test
 
-import java.io.{File, FileInputStream}
-import java.nio.file.StandardCopyOption
+import java.io.FileInputStream
 
 import org.apache.commons.io.IOUtils
 import org.junit.runner._
 import org.specs2.mutable._
 import org.specs2.runner._
 import org.specs2.specification.BeforeAfterEach
-import play.api.http.HeaderNames
-import play.api.libs.Files
-import play.api.libs.Files.TemporaryFile
-import play.api.libs.iteratee.{Iteratee, Enumerator}
+import play.api.db.slick.DatabaseConfigProvider
+import play.api.libs.iteratee.{Enumerator, Iteratee}
 import play.api.libs.json._
-import play.api.mvc.MultipartFormData.{MissingFilePart, BadPart, FilePart}
-import play.api.mvc.{AnyContentAsMultipartFormData, AnyContent, MultipartFormData}
 import play.api.test.Helpers._
 import play.api.test._
-
-import play.api.db.slick.DatabaseConfigProvider
-import play.api.{mvc, Logger, Play}
-
-import videosvc.models._
-import videosvc.models.Implicits._
-import videosvc.controllers.WebService
-
+import play.api.{Logger, Play, mvc}
 import slick.driver.JdbcProfile
-import videosvc.util.{Utils_MultipartFormdataBody_WithRoutingAndWritable, Utils_MultipartFormdataBody_WithoutRouting, Utils_MultipartFormdataAsRawBody}
+import videosvc.controllers.WebService
+import videosvc.models.Implicits._
+import videosvc.models._
+import videosvc.util._
 
-import scala.concurrent.{Future, Await}
-import scala.concurrent.duration.Duration
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
 
 /**
  * Add your spec here.
@@ -231,37 +222,36 @@ class WebServiceSpec extends Specification with BeforeAfter with BeforeAfterEach
       status(fResult) must equalTo(NOT_FOUND)
     }
 
-    
-/*
-    "add a new Video (only meta-data) to the server's store" in new WithApplication {
 
-      l.debug("---> Testing Actions addVideoMetaData()")
+//    "add a new Video (only meta-data) to the server's store" in new WithApplication {
+//
+//      l.debug("---> Testing Actions addVideoMetaData()")
+//
+//      val videoToAdd = new Video(-1L, "Bob", "Video of Bob 1", 10L, "", "")
+//      val videoDataFile = "testVideos/video1.mp4"
+//      l.debug("videoToAdd = " + videoToAdd)
+//
+//      // upload video
+//      //
+//      val Some(fResult): Option[Future[mvc.Result]] = route(FakeRequest(POST, "/video").withJsonBody(Json.toJson(videoToAdd)))
+//
+//      // check result
+//      //
+//      status(fResult) must equalTo(OK)
+//      contentType(fResult) must beSome.which(_ == "application/json")
+//
+//      val json: JsValue = Json.parse(contentAsString(fResult))
+//      l.debug("Got JSON: \n" + Json.prettyPrint(json))
+//      json.isInstanceOf[JsObject] must beTrue
+//      val vBob = json.as[Video]
+//      l.debug("Video: " + vBob)
+//
+//      l.debug("Video 3: " + vBob)
+//      vBob.id must equalTo(1L)
+//      vBob.title must equalTo("Video of Bob 1")
+//      vBob.duration must equalTo(10L)
+//    }
 
-      val videoToAdd = new Video(-1L, "Bob", "Video of Bob 1", 10L, "", "")
-      val videoDataFile = "testVideos/video1.mp4"
-      l.debug("videoToAdd = " + videoToAdd)
-
-      // upload video
-      //
-      val Some(fResult): Option[Future[mvc.Result]] = route(FakeRequest(POST, "/video").withJsonBody(Json.toJson(videoToAdd)))
-
-      // check result
-      //
-      status(fResult) must equalTo(OK)
-      contentType(fResult) must beSome.which(_ == "application/json")
-
-      val json: JsValue = Json.parse(contentAsString(fResult))
-      l.debug("Got JSON: \n" + Json.prettyPrint(json))
-      json.isInstanceOf[JsObject] must beTrue
-      val vBob = json.as[Video]
-      l.debug("Video: " + vBob)
-
-      l.debug("Video 3: " + vBob)
-      vBob.id must equalTo(1L)
-      vBob.title must equalTo("Video of Bob 1")
-      vBob.duration must equalTo(10L)
-    }
-*/
 
     "(in Test 6) succeed to add a new Video (meta-data and data) to the server's store" in new WithApplication {
 

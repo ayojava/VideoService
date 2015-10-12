@@ -16,27 +16,27 @@ case object Global extends GlobalSettings {
   val l: Logger = Logger(this.getClass())
 
   override def beforeStart(app: Application): Unit = {
-    l.info("===> WebService starting up ...")
+    l.debug("===> WebService starting up ...")
   }
 
   override def onStart(app: Application): Unit = {
-    l.info("===> WebService has started")
-    l.info("===> Creating Database Schema ...")
+    l.debug("===> WebService has started")
+    l.debug("===> Creating Database Schema ...")
     val db = DatabaseConfigProvider.get[JdbcProfile](Play.current).db
     Await.result(db.run(
       (TableQuery[Videos].schema ++ TableQuery[UserVideoRatings].schema).create
     ), Duration.Inf)
-    l.info("===> Database Schema created")
+    l.debug("===> Database Schema created")
   }
 
   override def onStop(app: Application): Unit = {
-    l.info("===> Dropping Database Schema ...")
+    l.debug("===> Dropping Database Schema ...")
     val db = DatabaseConfigProvider.get[JdbcProfile](Play.current).db
     Await.result(db.run(
       (TableQuery[Videos].schema ++ TableQuery[UserVideoRatings].schema).drop
     ), Duration.Inf)
-    l.info("<=== Database Schema dropped")
-    l.info("<=== WebService shutting down ...\n")
+    l.debug("<=== Database Schema dropped")
+    l.debug("<=== WebService shutting down ...\n")
   }
 
   override def onRequestReceived(request: RequestHeader): (RequestHeader, Handler) = {

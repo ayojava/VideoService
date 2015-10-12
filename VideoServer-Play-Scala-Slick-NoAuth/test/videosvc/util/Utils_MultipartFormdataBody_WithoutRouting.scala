@@ -8,7 +8,7 @@ import play.api.libs.Files
 import play.api.libs.Files.TemporaryFile
 import play.api.libs.json.Json
 import play.api.{Logger, mvc}
-import play.api.mvc.MultipartFormData
+import play.api.mvc.{Result, MultipartFormData}
 import play.api.mvc.MultipartFormData.{MissingFilePart, BadPart, FilePart}
 import play.api.test.{FakeHeaders, FakeRequest}
 import play.api.test.Helpers._
@@ -37,7 +37,12 @@ object Utils_MultipartFormdataBody_WithoutRouting {
       FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "multipart/form-data")),
       body = formData)
 
-    new WebService().addVideo.apply(request)
+    val futureResult: Future[Result] = new WebService().addVideo.apply(request)
+
+    val result: Result = await(futureResult)
+    Utils.removeFileIfExists(tmpFile)
+
+    futureResult
   }
 
   def multiPartFormData(dataPartKey: String, dataPartString: String,

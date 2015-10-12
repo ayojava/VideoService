@@ -125,7 +125,7 @@ class WebService extends Controller {
 
           case Some(filePart) =>
 
-            val contentType: String = filePart.contentType.get.split(":")(1).trim
+            val contentType: String = filePart.contentType.get
             l.debug("addVideo(): Video data has content-type: " + contentType)
             l.debug("addVideo(): Video data saved to temp file: " + filePart.filename)
 

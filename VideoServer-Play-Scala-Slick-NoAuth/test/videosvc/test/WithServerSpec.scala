@@ -320,15 +320,9 @@ class WithServerSpec extends PlaySpecification with Results with BeforeAfter wit
 
     val request: WSRequest = WS.url(baseUrl + "/video").withBody(anyContent)(anyContentAsMultipartFormDataWritable)
     val response: WSResponse = await(request.execute(POST)) // (new Timeout(40, TimeUnit.SECONDS))
+
+    Utils.removeFileIfExists(tmpFile)
+
     response
   }
-
-//  def bodyAsBytes(fResult: Future[mvc.Result]): Array[Byte] = {
-//    val result: mvc.Result = Await.result(fResult, Duration.Inf)
-//    val bodyEnumerator: Enumerator[Array[Byte]] = result.body
-//    val futureOfBodyAsBytes: Future[Array[Byte]] = bodyEnumerator.run(Iteratee.fold(Array.empty[Byte]) {
-//      (memo, nextChunk) => memo ++ nextChunk
-//    })
-//    Await.result(futureOfBodyAsBytes, Duration.Inf)
-//  }
 }
