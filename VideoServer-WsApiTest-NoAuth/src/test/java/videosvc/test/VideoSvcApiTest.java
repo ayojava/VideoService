@@ -33,7 +33,7 @@ public class VideoSvcApiTest {
 
 	private static final String SERVER = "http://localhost:9000";
 
-	private File testVideoData = new File("src/test/resources/test.mp4");
+	private File testVideoData = new File("src/test/resources/video1.mp4");
 
     private Video video =
             Video.create()
