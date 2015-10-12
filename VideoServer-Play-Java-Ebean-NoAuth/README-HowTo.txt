@@ -32,23 +32,20 @@ Prerequisites to test and run
 -----------------------------
 
 1. Installation of JDK 1.8
-2. Installation of Typesage Activator from
-   https://downloads.typesafe.com/typesafe-activator/1.3.6/typesafe-activator-1.3.6-minimal.zip
-3. Include $ACTIVATOR_HOME/bin into your path PATH
 
 
 How to test and run (from the command line)
 -------------------------------------------
 
-$ activator test                    # runs the tests
+$ ./activator test                    # runs the tests
 
-$ activator run [ -Dhttp.port=<some_port> ]         # launches the app
+$ ./activator run [ -Dhttp.port=<some_port> ]         # launches the app
 
 
 How to import the project into IntelliJ
 ---------------------------------------
 
-$ activator gen-idea    # generates IntelliJ project files
+$ ./activator gen-idea    # generates IntelliJ project files
 
 - Open IntelliJ (with Scala Plugin installed)
 - Select "File -> Open Project"
@@ -58,7 +55,7 @@ $ activator gen-idea    # generates IntelliJ project files
 How to import the project into (Eclipse based) ScalaIDE
 -------------------------------------------------------
 
-$ activator eclipse    # generates Eclipse project files
+$ ./activator eclipse    # generates Eclipse project files
 
 - Open ScalaIDE
 - Select "File -> Import..."
