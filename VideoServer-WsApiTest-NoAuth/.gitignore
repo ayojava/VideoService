@@ -27,6 +27,7 @@ build/
 logs
 target/
 .cache
+.cache-*
 .history
 .lib/
 dist/*
@@ -40,3 +41,4 @@ videos/
 videos.tmp/
 testVideos.bak/
 
+/bin/
