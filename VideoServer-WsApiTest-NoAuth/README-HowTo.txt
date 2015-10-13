@@ -24,13 +24,13 @@ Prerequisites to test and run
 How to run this test (from the command line)
 --------------------------------------------
 
-$ gradle test           # runs the test
+$ gradle test -i [ -Dserver.url=<the_servers_url> ]           # runs the test
+
+If you don't specify the server.url the test uses http://localhost:9000 as default.
 
 
 How to import the project into IntelliJ
 ---------------------------------------
-
-$ activator gen-idea    # generates IntelliJ project files
 
 - Open IntelliJ
 - Select "File -> New Project -> Project from Existing Sources"

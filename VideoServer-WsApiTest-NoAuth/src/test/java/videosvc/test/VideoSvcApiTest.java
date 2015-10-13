@@ -31,8 +31,6 @@ import retrofit.mime.TypedFile;
 
 public class VideoSvcApiTest {
 
-	private static final String SERVER = "http://localhost:9000";
-
 	private File testVideoData = new File("src/test/resources/video1.mp4");
 
     private Video video =
@@ -42,11 +40,22 @@ public class VideoSvcApiTest {
                     .withDuration(123)
                     .build();
 
-	private static VideoSvcApi videoSvc = new RestAdapter.Builder()
-			.setEndpoint(SERVER)
-            .setLogLevel(RestAdapter.LogLevel.NONE)
-            .build()
-			.create(VideoSvcApi.class);
+    private static final String DEFAULT_SERVER_URL = "http://localhost:9000";
+    private static String serverUrl = null;
+    private static VideoSvcApi videoSvc = null;
+
+    private static VideoSvcApi service() {
+        if (videoSvc == null) {
+            serverUrl = System.getProperty("server.url", DEFAULT_SERVER_URL);
+            System.out.println("serverUrl = " + serverUrl);
+            videoSvc = new RestAdapter.Builder()
+                    .setEndpoint(serverUrl)
+                    .setLogLevel(RestAdapter.LogLevel.NONE)
+                    .build()
+                    .create(VideoSvcApi.class);
+        }
+        return videoSvc;
+    }
 
     @Before
     public void setUp() {
@@ -62,14 +71,14 @@ public class VideoSvcApiTest {
     public static void setUpClass() {
         System.out.println("----- setUpClass() ----------");
         try {
-            Boolean ok = videoSvc.ping();
+            Boolean ok = service().ping();
             if (!ok) {
-                System.err.println("VideoServer not available on " + SERVER);
+                System.err.println("VideoServer not available on " + serverUrl);
                 System.exit(1);
             }
-            System.out.println("VideoServer is running on " + SERVER);
+            System.out.println("VideoServer is running on " + serverUrl);
         } catch (Exception e) {
-            System.err.println("VideoServer not available on " + SERVER +
+            System.err.println("VideoServer not available on " + serverUrl +
                     ", got Exception: (" + e.getClass().getName() + ") with message: " + e.getMessage());;
             System.exit(1);
         }
@@ -121,16 +130,16 @@ public class VideoSvcApiTest {
         TypedByteArray typedByteArray = new TypedByteArray("mime/type", "some bytes".getBytes());
         */
 
-        Video addedVideo = videoSvc.addVideo(video, new TypedFile("video/mp4", testVideoData));
+        Video addedVideo = service().addVideo(video, new TypedFile("video/mp4", testVideoData));
 
         assertTrue(addedVideo != null);
         assertTrue(addedVideo.getId() > 0);
         assertTrue(addedVideo.getTitle().equals(video.getTitle()));
         assertTrue(addedVideo.getDuration() == video.getDuration());
 
-        assertTrue(videoIsInList(videoSvc.getVideoList(), video));
+        assertTrue(videoIsInList(service().getVideoList(), video));
 
-        Response response = videoSvc.downloadVideoData(addedVideo.getId());
+        Response response = service().downloadVideoData(addedVideo.getId());
         assertEquals(200, response.getStatus());
 
         InputStream videoData = response.getBody().in();
@@ -147,7 +156,7 @@ public class VideoSvcApiTest {
         Long nonExistantId = getInvalidVideoId();
 
         try {
-            Response r = videoSvc.downloadVideoData(nonExistantId);
+            Response r = service().downloadVideoData(nonExistantId);
             assertEquals(404, r.getStatus());
         } catch (RetrofitError e) {
             assertEquals(404, e.getResponse().getStatus());
@@ -171,10 +180,10 @@ public class VideoSvcApiTest {
 
         System.out.println("----- testAddVideoRating() ----------");
 
-        Video addedVideo = videoSvc.addVideo(video, new TypedFile("video/mp4", testVideoData));
-        assert(videoIsInList(videoSvc.getVideoList(), video));
-        assert(videoSvc.rateVideo(addedVideo.getId(), 2).getRating() == 2.0);
-        assert(videoSvc.rateVideo(addedVideo.getId(), 5).getRating() == 5.0);
+        Video addedVideo = service().addVideo(video, new TypedFile("video/mp4", testVideoData));
+        assert(videoIsInList(service().getVideoList(), video));
+        assert(service().rateVideo(addedVideo.getId(), 2).getRating() == 2.0);
+        assert(service().rateVideo(addedVideo.getId(), 5).getRating() == 5.0);
     }
 
     @Test
@@ -182,10 +191,10 @@ public class VideoSvcApiTest {
 
         System.out.println("----- testDeleteVideos() ----------");
 
-        Video addedVideo = videoSvc.addVideo(video, new TypedFile("video/mp4", testVideoData));
-        assert(videoIsInList(videoSvc.getVideoList(), video));
-        addedVideo = videoSvc.addVideo(video, new TypedFile("video/mp4", testVideoData));
-        assert(videoIsInList(videoSvc.getVideoList(), video));
+        Video addedVideo = service().addVideo(video, new TypedFile("video/mp4", testVideoData));
+        assert(videoIsInList(service().getVideoList(), video));
+        addedVideo = service().addVideo(video, new TypedFile("video/mp4", testVideoData));
+        assert(videoIsInList(service().getVideoList(), video));
         deleteVideos();
     }
 
@@ -193,7 +202,7 @@ public class VideoSvcApiTest {
 
 	private Long getInvalidVideoId() {
 
-        Set<Long> ids = videoSvc.getVideoList()
+        Set<Long> ids = service().getVideoList()
                 .stream()
                 .map(v -> v.getId())
                 .collect(Collectors.<Long>toSet());
@@ -222,12 +231,12 @@ public class VideoSvcApiTest {
     }
 
     private static void deleteVideos() {
-        Collection<Video> videos = videoSvc.getVideoList();
+        Collection<Video> videos = service().getVideoList();
         videos.stream().forEach(v -> {
-            boolean deleted = videoSvc.deleteVideo(v.getId());
+            boolean deleted = service().deleteVideo(v.getId());
             assertTrue(deleted);
         });
-        assertTrue(videoSvc.getVideoList().isEmpty());
+        assertTrue(service().getVideoList().isEmpty());
     }
 
     private static void sleep(long secs) {

@@ -41,6 +41,8 @@ $ ./activator test                    # runs the tests
 
 $ ./activator run [ -Dhttp.port=<some_port> ]         # launches the app
 
+If you don't specify the http.port the App uses port 9000 as default.
+
 
 How to import the project into IntelliJ
 ---------------------------------------
