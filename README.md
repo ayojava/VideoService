@@ -11,7 +11,7 @@ Via this API the client can
 
 There are currently two implementations of the service,
 one using the Play-Java API with Ebean persistence and
-the other one using the Play-Scala-API with Slick persistence.
+the other one using the Play-Scala API with Slick persistence.
 
 The third project is an external test client which requires that
 you first start a VideoServer and run the tests afterwards.
