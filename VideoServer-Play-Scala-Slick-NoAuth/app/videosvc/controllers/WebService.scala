@@ -3,6 +3,7 @@ package videosvc.controllers
 import java.io.File
 import javax.inject.Inject
 
+import play.api.libs.iteratee.Enumerator
 import play.api.{Play, Logger}
 import play.api.db.slick.DatabaseConfigProvider
 import play.api.libs.Files.TemporaryFile
@@ -14,7 +15,7 @@ import videosvc.models.Implicits._
 import videosvc.models._
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 // class WebService @Inject()(dbConfigProvider: DatabaseConfigProvider) extends Controller {
@@ -36,17 +37,22 @@ class WebService extends Controller {
   implicit val videoDataDir: String = "videos"
 
 
+  // route:   GET     /ping
   def ping = Action {
     l.debug("ping()")
     Ok(Json.toJson(true))
   }
 
+
+  // route:   GET     /video/
   def findAll = Action.async {
     l.debug("findAll()")
     val dbAction = videos.result
     db.run(dbAction).map(videoSeq => Ok(Json.toJson(videoSeq.toList)))
   }
 
+
+  // route:   GET     /video/:id
   def findById(id: Long) = Action.async {
     l.debug("findById(id = " + id + ")")
     fVideoOptById(id).map(toResult(_, id))
@@ -68,6 +74,8 @@ class WebService extends Controller {
     }
   }
 
+
+  // route:   DELETE  /video/:id
   def deleteById(id: Long) = Action.async {
     l.debug("deleteById(id = " + id + ")")
     val dbAction = TableQuery[Videos].filter(_.id === id).delete
@@ -79,7 +87,9 @@ class WebService extends Controller {
     }
   }
 
-  def addVideoMetaData = Action.async(BodyParsers.parse.json) { request =>
+/*
+  // route:   GET     /video/:id
+  def addVideoMetaData() = Action.async(BodyParsers.parse.json) { request =>
 
     l.debug("addVideo()")
 
@@ -92,12 +102,15 @@ class WebService extends Controller {
         }
       },
       video => {
-        insert(video).map { v => Ok(Json.toJson(v)) }
+        dbInsert(video).map { v => Ok(Json.toJson(v)) }
       }
     )
   }
+*/
 
-  def addVideo = Action.async(BodyParsers.parse.multipartFormData) { request =>
+
+  // route:   POST    /video
+  def addVideo() = Action.async(BodyParsers.parse.multipartFormData) { request =>
 
     l.debug("addVideo(): Got multipart formdata")
 
@@ -126,32 +139,40 @@ class WebService extends Controller {
           case Some(filePart) =>
 
             val contentType: String = filePart.contentType.get
+            val filename: String = filePart.filename
+            val ref: TemporaryFile = filePart.ref
             l.debug("addVideo(): Video data has content-type: " + contentType)
-            l.debug("addVideo(): Video data saved to temp file: " + filePart.filename)
+            l.debug("addVideo(): Video data saved to temp file: " + filename)
 
             val json: JsValue = Json.parse(metaData)
             val vNew: Video = json.as[Video]
 
+/*
+            // This solution works, but should be avoided
+            // as it blocks the current thread with Await.result().
             Future {
               val vStored: Video = Await.result(insert(vNew), Duration.Inf) // now the inserted video has a new generated id
-              val vForUpdate: Video = newVideo(vStored, contentType, request) // add contentType and url
-              createDirIfNotExists(videoDataDir)
-              filePart.ref.moveTo(new File(vForUpdate.dataPath), true) // move temp file to permanent location
-              val vUpdated = Await.result(update(vForUpdate), Duration.Inf) // update video with added properties in db
-              l.debug("addVideo(): new video stored in db: " + vUpdated)
+              val vForUpdate: Video = updatedVideo(vStored, contentType, request) // add contentType and url
+              val vForUpdate2: Video = moveTmpFileToPermanentLocation(vForUpdate, ref) // update video with added properties in db
+              val vUpdated = Await.result(update(vForUpdate2), Duration.Inf)
               Ok(Json.toJson(vUpdated))
             }
+*/
+
+            // This solution doesn't block the current thread.
+            dbInsert(vNew)
+              .map(updatedVideo(_, contentType, request))
+              .map(moveTmpFileToPermanentLocation(_, ref))
+              .flatMap(dbUpdate(_))
+              .map { v =>
+                l.debug("addVideo(): new video stored in db: " + v)
+                Ok(Json.toJson(v))
+              }
         }
     }
   }
 
-  private def createDirIfNotExists(dir: String): Unit = {
-    val path: java.nio.file.Path = new File(dir).toPath
-    if (!java.nio.file.Files.exists(path))
-      java.nio.file.Files.createDirectories(path)
-  }
-
-  private def newVideo(v: Video, contentType: String, request: Request[MultipartFormData[TemporaryFile]]): Video =
+  private def updatedVideo(v: Video, contentType: String, request: Request[MultipartFormData[TemporaryFile]]): Video =
     new Video(v.id, v.owner, v.title, v.duration, contentType, urlFor(request, v.id))
 
   private def urlFor(request: Request[MultipartFormData[TemporaryFile]], id: Long): String =
@@ -160,56 +181,35 @@ class WebService extends Controller {
   private def host(request: Request[MultipartFormData[TemporaryFile]]): String =
     if (request.host == null || request.host.trim.length == 0) "localhost" else request.host
 
-  private def update(v: Video): Future[Video] = {
-    db.run(
-      TableQuery[Videos].filter(_.id === v.id).update(v)
-        andThen
-        TableQuery[Videos].filter(_.id === v.id).result
-    ) map (_.head)
+  private def moveTmpFileToPermanentLocation(video: Video, ref: TemporaryFile): Video = {
+    createDirIfNotExists(videoDataDir)
+    ref.moveTo(new File(video.dataPath), true) // move temp file to permanent location
+    video
   }
 
-  private def insert(video: Video) = insert_4(video)
-
-  private def insert_1(video: Video): Future[Video] = {
-
-    val id: Long = Await.result(
-      db.run(
-        (videos returning videos.map(_.id)) += video),
-      Duration.Inf
-    )
-    val dbAction = {
-      videos.filter(_.id === id).result
-    }
-    db.run(dbAction).map(_.toList.head)
+  private def createDirIfNotExists(dir: String): Unit = {
+    val path: java.nio.file.Path = new File(dir).toPath
+    if (!java.nio.file.Files.exists(path))
+      java.nio.file.Files.createDirectories(path)
   }
 
-  private def insert_2(video: Video): Future[Video] = {
-
-    val fId: Future[Long] = db.run(
-      (videos returning videos.map(_.id)) += video
-    )
-    val fVideo: Future[Video] = fId.flatMap { id =>
-      val dbAction = videos.filter(_.id === id)
-      db.run(dbAction.result).map(_.toList.head)
-    }
-    fVideo
-  }
-
-  private def insert_3(v: Video): Future[Video] = {
-    db.run(
-      (videos returning videos.map(_.id)) += v
-    ).flatMap { id =>
-      db.run(videos.filter(_.id === id).result).map(_.toList.head)
-    }
-  }
-
-  private def insert_4(v: Video): Future[Video] = {
+  private def dbInsert(video: Video): Future[Video] = {
     for {
-      id <- db.run((videos returning videos.map(_.id)) += v)
+      id <- db.run((videos returning videos.map(_.id)) += video)
       vs <- db.run(videos.filter(_.id === id).result).map(_.toList)
     } yield vs.head
   }
 
+  private def dbUpdate(v: Video): Future[Video] = {
+    db.run(
+      TableQuery[Videos].filter(_.id === v.id).update(v)
+        andThen
+        TableQuery[Videos].filter(_.id === v.id).result
+    ) map { vSeq => vSeq.head }
+  }
+
+
+  // route:   GET     /video/:id/data
   def getVideoData(id: Long) = Action {
 
     l.debug("getVideoData(id = " + id + ")")
@@ -226,19 +226,22 @@ class WebService extends Controller {
           l.debug("getVideoData(): No data found for video with id " + id)
           NotFound("No data found for video with id " + id)
         } else {
-          //          Result(
-          //            header = ResponseHeader(200),
-          //            body = Enumerator.fromFile(new File(video.dataPath))
-          //          ).withHeaders("Content-Type" -> "video/mp4")
+/*
+          Result(
+            header = ResponseHeader(200),
+            body = Enumerator.fromFile(new File(video.dataPath))
+          ).withHeaders("Content-Type" -> "video/mp4")
+*/
           Ok.sendFile(new File(video.dataPath))
-          // .withHeaders("Content-Type" -> "video/mp4")
         }
     }
   }
 
   private def existsDataFile(video: Video) = java.nio.file.Files.exists(new File(video.dataPath).toPath)
 
-  def addVideoRating(id: Long, stars: Int) = Action {
+
+  // route:   POST    /video/:id/rating/:stars
+  def addVideoRating(id: Long, stars: Int) = Action.async {
 
     l.debug("addVideoRating(id = " + id + ", stars = " + stars + ")")
 
@@ -246,33 +249,37 @@ class WebService extends Controller {
 
       case None =>
         l.debug("getVideoData(): Video with id " + id + " doesn't exist.")
-        NotFound("Video with id " + id + " doesn't exist.")
+        Future { NotFound("Video with id " + id + " doesn't exist.") }
 
       case Some(video) =>
-        val avgRating: AverageVideoRating = updateVideoRatingById(video.id, video.owner, stars)
-        Ok(Json.toJson(avgRating))
+        updateVideoRatingById(video.id, video.owner, stars)
+          .map{ r => Ok(Json.toJson(r)) }
     }
   }
 
-  private def updateVideoRatingById(videoId: Long, user: String, stars: Int): AverageVideoRating = {
+  private def updateVideoRatingById(videoId: Long, user: String, stars: Int): Future[AverageVideoRating] = {
 
-    val uvr = new UserVideoRating(videoId, stars, user)
+    db.run {
 
-    // try to update existing row
-    val nRows = Await.result(db.run(
-      TableQuery[UserVideoRatings].filter(r => r.videoId === videoId && r.user === user).update(uvr)
-    ), Duration.Inf)
+      // try to update existing row
+      TableQuery[UserVideoRatings]
+        .filter(r => r.videoId === videoId && r.user === user)
+        .update(UserVideoRating(videoId, stars, user))
 
-    // if no row for update exists, insert new row
-    if (nRows < 1) {
-      Await.result(db.run(
-        TableQuery[UserVideoRatings] += new UserVideoRating(videoId, stars, user)
-      ), Duration.Inf)   }
+    }.flatMap { nRows =>
 
-    averageVideoRating(videoId)
+        if (nRows > 0)    // no row was updated
+          Future(nRows)     // return the number of updated rows
+        else        // perform insert if no update was performed
+          db.run( TableQuery[UserVideoRatings] += new UserVideoRating(videoId, stars, user) )     // return the number of inserted rows
+
+    }.flatMap { whatever =>
+      averageVideoRating(videoId)
+    }
   }
 
-  def getVideoRating(id: Long) = Action {
+  // route:   GET     /video/:id/rating
+  def getVideoRating(id: Long) = Action.async {
 
     l.debug("getVideoRating(id = " + id + ")")
 
@@ -280,24 +287,19 @@ class WebService extends Controller {
 
       case None =>
         l.debug("getVideoData(): Video with id " + id + " doesn't exist.")
-        NotFound("Video with id " + id + " doesn't exist.")
+        Future { NotFound("Video with id " + id + " doesn't exist.") }
 
       case Some(video) =>
-        val avgRating: AverageVideoRating = averageVideoRating(video.id)
-        Ok(Json.toJson(avgRating))
+        averageVideoRating(video.id).map( r => Ok(Json.toJson(r)) )
     }
   }
 
-  private def averageVideoRating(videoId: Long): AverageVideoRating = {
-    val avgRating = Await.result(db.run(
-      TableQuery[UserVideoRatings].filter(_.videoId === videoId).map(r => r.rating).avg.result
-    ), Duration.Inf).get
+  private def averageVideoRating(videoId: Long): Future[AverageVideoRating] = {
 
-    val totalRatings = Await.result(db.run(
-      TableQuery[UserVideoRatings].filter(_.videoId === videoId).length.result
-    ), Duration.Inf)
-
-    new AverageVideoRating(videoId, avgRating, totalRatings)
+    for {
+      avgRating <- db.run( TableQuery[UserVideoRatings].filter(_.videoId === videoId).map(r => r.rating).avg.result )
+      totalRatings <- db.run( TableQuery[UserVideoRatings].filter(_.videoId === videoId).length.result )
+    } yield AverageVideoRating(videoId, avgRating.getOrElse(-1.0), totalRatings)
   }
 }
 
