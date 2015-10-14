@@ -16,7 +16,7 @@ import videosvc.models._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
 // class WebService @Inject()(dbConfigProvider: DatabaseConfigProvider) extends Controller {
   // val dbConfig = dbConfigProvider.get[JdbcProfile]                            // get db driver via DI
@@ -31,59 +31,54 @@ class WebService extends Controller {
 
   val db = dbConfig.db
 
-  val videos = TableQuery[Videos]
-  val userVideoRatings = TableQuery[UserVideoRatings]
-
   implicit val videoDataDir: String = "videos"
 
 
   // route:   GET     /ping
   def ping = Action {
+
     l.debug("ping()")
+
     Ok(Json.toJson(true))
   }
 
 
   // route:   GET     /video/
   def findAll = Action.async {
+
     l.debug("findAll()")
-    val dbAction = videos.result
-    db.run(dbAction).map(videoSeq => Ok(Json.toJson(videoSeq.toList)))
+
+    db.run {
+      TableQuery[Videos].result
+    }.map(videoSeq => Ok(Json.toJson(videoSeq.toList)))
   }
 
 
   // route:   GET     /video/:id
   def findById(id: Long) = Action.async {
+
     l.debug("findById(id = " + id + ")")
-    fVideoOptById(id).map(toResult(_, id))
-  }
 
-  private def fVideoOptById(id: Long): Future[Option[Video]] = {
-    val dbAction = videos.filter(_.id === id).result
-    db.run(dbAction).map(videoSeq => videoSeq.toList.headOption)
-  }
-
-  private def videoOptById(id: Long): Option[Video] = Await.result(fVideoOptById(id), Duration.Inf)
-
-  private def videoById(id: Long): Video = videoOptById(id).get
-
-  private def toResult(vOpt: Option[Video], id: Long): Result = {
-    vOpt match {
-      case Some(video) => Ok(Json.toJson(video))
-      case None => NotFound("Video with id " + id + " not found.")
+    dbQueryVideoById(id).map { _ match {
+        case None => NotFound("Video with id " + id + " not found.")
+        case Some(video) => Ok(Json.toJson(video))
+      }
     }
   }
 
 
   // route:   DELETE  /video/:id
   def deleteById(id: Long) = Action.async {
+
     l.debug("deleteById(id = " + id + ")")
-    val dbAction = TableQuery[Videos].filter(_.id === id).delete
-    db.run(dbAction).map { nRows =>
-      if (nRows > 0)
-        Ok(Json.toJson(true))
-      else
+
+    db.run{
+      TableQuery[Videos].filter(_.id === id).delete
+    }.map { nRows =>
+      if (nRows < 1)
         NotFound("Video with id " + id + " not found.")
+      else
+        Ok(Json.toJson(true))
     }
   }
 
@@ -194,6 +189,7 @@ class WebService extends Controller {
   }
 
   private def dbInsert(video: Video): Future[Video] = {
+    val videos = TableQuery[Videos]
     for {
       id <- db.run((videos returning videos.map(_.id)) += video)
       vs <- db.run(videos.filter(_.id === id).result).map(_.toList)
@@ -210,11 +206,18 @@ class WebService extends Controller {
 
 
   // route:   GET     /video/:id/data
-  def getVideoData(id: Long) = Action {
+  def getVideoData(id: Long) = Action.async {
 
     l.debug("getVideoData(id = " + id + ")")
 
-    videoOptById(id) match {
+    dbQueryVideoById(id).map { videoOpt =>
+      sendFileResult(id, videoOpt)
+    }
+  }
+
+  def sendFileResult(id: Long, videoOption: Option[Video]): Result = {
+
+    videoOption match {
 
       case None =>
         l.debug("getVideoData(): Video with id " + id + " doesn't exist.")
@@ -226,12 +229,12 @@ class WebService extends Controller {
           l.debug("getVideoData(): No data found for video with id " + id)
           NotFound("No data found for video with id " + id)
         } else {
-/*
-          Result(
-            header = ResponseHeader(200),
-            body = Enumerator.fromFile(new File(video.dataPath))
-          ).withHeaders("Content-Type" -> "video/mp4")
-*/
+          /*
+                      Result(
+                        header = ResponseHeader(200),
+                        body = Enumerator.fromFile(new File(video.dataPath))
+                      ).withHeaders("Content-Type" -> "video/mp4")
+            */
           Ok.sendFile(new File(video.dataPath))
         }
     }
@@ -245,15 +248,24 @@ class WebService extends Controller {
 
     l.debug("addVideoRating(id = " + id + ", stars = " + stars + ")")
 
-    videoOptById(id) match {
+    dbQueryVideoById(id).flatMap { videoOpt =>
+      doAddVideoRating(id, stars, videoOpt)
+    }
+  }
+
+  private def doAddVideoRating(id: Long, stars: Int, videoOption: Option[Video]): Future[Result] = {
+
+    videoOption match {
 
       case None =>
         l.debug("getVideoData(): Video with id " + id + " doesn't exist.")
-        Future { NotFound("Video with id " + id + " doesn't exist.") }
+        Future {
+          NotFound("Video with id " + id + " doesn't exist.")
+        }
 
       case Some(video) =>
         updateVideoRatingById(video.id, video.owner, stars)
-          .map{ r => Ok(Json.toJson(r)) }
+          .map { r => Ok(Json.toJson(r)) }
     }
   }
 
@@ -278,19 +290,38 @@ class WebService extends Controller {
     }
   }
 
+
   // route:   GET     /video/:id/rating
   def getVideoRating(id: Long) = Action.async {
 
     l.debug("getVideoRating(id = " + id + ")")
 
-    videoOptById(id) match {
+    dbQueryVideoById(id).flatMap { videoOpt =>
+      doGetVideoRating(id, videoOpt)
+    }
+  }
+
+  def dbQueryVideoById(id: Long): Future[Option[Video]] = {
+    db.run {
+      TableQuery[Videos].filter(_.id === id).result
+    }.map {
+      videoSeq => videoSeq.toList.headOption
+    }
+  }
+
+  private def doGetVideoRating(id: Long, videoOpt: Option[Video]): Future[Result] = {
+
+    videoOpt match {
 
       case None =>
         l.debug("getVideoData(): Video with id " + id + " doesn't exist.")
-        Future { NotFound("Video with id " + id + " doesn't exist.") }
+        Future {
+          NotFound("Video with id " + id + " doesn't exist.")
+        }
 
       case Some(video) =>
-        averageVideoRating(video.id).map( r => Ok(Json.toJson(r)) )
+        averageVideoRating(video.id)
+          .map(r => Ok(Json.toJson(r)))
     }
   }
 
