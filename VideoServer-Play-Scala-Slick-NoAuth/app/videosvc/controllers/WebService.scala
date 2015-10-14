@@ -1,9 +1,7 @@
 package videosvc.controllers
 
 import java.io.File
-import javax.inject.Inject
 
-import play.api.libs.iteratee.Enumerator
 import play.api.{Play, Logger}
 import play.api.db.slick.DatabaseConfigProvider
 import play.api.libs.Files.TemporaryFile
@@ -17,7 +15,6 @@ import videosvc.models.Implicits._
 import videosvc.models._
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 import scala.concurrent.Future
 
 import slick.driver.H2Driver.api._
@@ -98,8 +95,14 @@ class Dao(val db: BasicProfile#Backend#Database) {
 }
 
 
-// class WebService @Inject()(dbConfigProvider: DatabaseConfigProvider) extends Controller {
-  // val dbConfig = dbConfigProvider.get[JdbcProfile]                            // get db driver via DI
+/*
+import javax.inject.Inject
+
+class WebService @Inject()(dbConfigProvider: DatabaseConfigProvider) extends Controller {
+  val dbConfig = dbConfigProvider.get[JdbcProfile]                            // get db driver via DI
+  ...
+}
+*/
 
 class WebService extends Controller {
 
@@ -135,10 +138,9 @@ class WebService extends Controller {
 
     l.debug("findById(id = " + id + ")")
 
-    dao.queryVideoById(id).map { _ match {
-        case None => NotFound("Video with id " + id + " not found.")
+    dao.queryVideoById(id).map {
+        case None => notFound("Video with id " + id + " not found.")
         case Some(video) => Ok(Json.toJson(video))
-      }
     }
   }
 
@@ -150,7 +152,7 @@ class WebService extends Controller {
 
     dao.deleteVideoById(id).map { nRows =>
       if (nRows < 1)
-        NotFound("Video with id " + id + " not found.")
+        notFound("Video with id " + id + " not found.")
       else
         Ok(Json.toJson(true))
     }
@@ -238,7 +240,7 @@ class WebService extends Controller {
 
   private def moveTmpFileToPermanentLocation(video: Video, ref: TemporaryFile): Video = {
     createDirIfNotExists(videoDataDir)
-    ref.moveTo(new File(video.dataPath), true) // move temp file to permanent location
+    ref.moveTo(new File(video.dataPath), replace = true) // move temp file to permanent location
     video
   }
 
@@ -260,23 +262,16 @@ class WebService extends Controller {
   }
 
   def sendFileResult(id: Long, videoOption: Option[Video]): Result = {
-
     videoOption match {
-
-      case None =>
-        l.debug("getVideoData(): Video with id " + id + " doesn't exist.")
-        NotFound("Video with id " + id + " doesn't exist.")
-
+      case None => notFound("Video with id " + id + " not found.")
       case Some(video) =>
-
         if (!existsDataFile(video)) {
-          l.debug("getVideoData(): No data found for video with id " + id)
-          NotFound("No data found for video with id " + id)
+          notFound("No data found for video with id " + id)
         } else {
           /*
                       Result(
                         header = ResponseHeader(200),
-                        body = Enumerator.fromFile(new File(video.dataPath))
+                        body = play.api.libs.iteratee.Enumerator.fromFile(new File(video.dataPath))
                       ).withHeaders("Content-Type" -> "video/mp4")
             */
           Ok.sendFile(new File(video.dataPath))
@@ -299,11 +294,7 @@ class WebService extends Controller {
 
   private def doAddVideoRating(id: Long, stars: Int, videoOption: Option[Video]): Future[Result] = {
     videoOption match {
-      case None =>
-        l.debug("getVideoData(): Video with id " + id + " doesn't exist.")
-        Future {
-          NotFound("Video with id " + id + " doesn't exist.")
-        }
+      case None => fNotFound("Video with id " + id + " not found.")
       case Some(video) =>
         dao.updateRatingByVideoId(video.id, video.owner, stars)
           .map { r => Ok(Json.toJson(r)) }
@@ -323,15 +314,23 @@ class WebService extends Controller {
 
   private def doGetVideoRating(id: Long, videoOpt: Option[Video]): Future[Result] = {
     videoOpt match {
-      case None =>
-        l.debug("getVideoData(): Video with id " + id + " doesn't exist.")
-        Future {
-          NotFound("Video with id " + id + " doesn't exist.")
-        }
+      case None => fNotFound("Video with id " + id + " not found.")
       case Some(video) =>
         dao.queryRatingByVideoId(video.id)
           .map(r => Ok(Json.toJson(r)))
     }
+  }
+
+  def fNotFound(msg: String): Future[Result] = {
+    l.debug(msg)
+    Future {
+      NotFound(msg)
+    }
+  }
+
+  def notFound(msg: String): Result = {
+    l.debug(msg)
+    NotFound(msg)
   }
 }
 
