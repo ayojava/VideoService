@@ -10,7 +10,9 @@ import play.api.libs.Files.TemporaryFile
 import play.api.libs.json._
 import play.api.mvc.MultipartFormData.FilePart
 import play.api.mvc._
+import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
+import slick.profile.BasicProfile
 import videosvc.models.Implicits._
 import videosvc.models._
 
@@ -18,20 +20,96 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.Future
 
+import slick.driver.H2Driver.api._
+
+class Dao(val db: BasicProfile#Backend#Database) {
+
+  def queryAllVideos: Future[Seq[Video]] = {
+    db.run {
+      TableQuery[Videos].result
+    }
+  }
+
+  def queryVideoById(id: Long): Future[Option[Video]] = {
+    db.run {
+      TableQuery[Videos].filter(_.id === id).result
+    }.map {
+      videoSeq => videoSeq.toList.headOption
+    }
+  }
+
+  def deleteVideoById(id: Long): Future[Int] = {
+    db.run {
+      TableQuery[Videos].filter(_.id === id).delete
+    }
+  }
+
+  def insertVideo(video: Video): Future[Video] = {
+    val videos = TableQuery[Videos]
+    for {
+      id <- db.run((videos returning videos.map(_.id)) += video)
+      vs <- db.run(videos.filter(_.id === id).result).map(_.toList)
+    } yield vs.head
+  }
+
+  def updateVideo(v: Video): Future[Video] = {
+    db.run(
+      TableQuery[Videos].filter(_.id === v.id).update(v)
+        andThen
+        TableQuery[Videos].filter(_.id === v.id).result
+    ) map { vSeq => vSeq.head }
+  }
+
+  def updateRatingByVideoId(videoId: Long, user: String, stars: Int): Future[AverageVideoRating] = {
+
+    updateRatingIfExists(videoId, user, stars)
+    .flatMap { nRows =>
+      insertRatingIfNotUpdated(nRows, videoId, user, stars)
+    }.flatMap { whatever =>
+      queryRatingByVideoId(videoId)
+    }
+  }
+
+  def queryRatingByVideoId(videoId: Long): Future[AverageVideoRating] = {
+
+    for {
+      avgRating <- db.run( TableQuery[UserVideoRatings].filter(_.videoId === videoId).map(r => r.rating).avg.result )
+      totalRatings <- db.run( TableQuery[UserVideoRatings].filter(_.videoId === videoId).length.result )
+    } yield AverageVideoRating(videoId, avgRating.getOrElse(-1.0), totalRatings)
+  }
+
+  private def updateRatingIfExists(videoId: Long, user: String, stars: Int): Future[Int] = {
+    db.run {
+      // try to update existing row
+      TableQuery[UserVideoRatings]
+        .filter(r => r.videoId === videoId && r.user === user)
+        .update(UserVideoRating(videoId, stars, user))
+    }
+  }
+
+  private def insertRatingIfNotUpdated(nRowsUpdated: Int, videoId: Long, user: String, stars: Int): Future[Int] = {
+
+    if (nRowsUpdated > 0) // no row was updated
+      Future(nRowsUpdated) // return the number of updated rows
+    else // perform insert if no update was performed
+      db.run(TableQuery[UserVideoRatings] += new UserVideoRating(videoId, stars, user)) // return the number of inserted rows
+
+  }
+}
+
+
 // class WebService @Inject()(dbConfigProvider: DatabaseConfigProvider) extends Controller {
   // val dbConfig = dbConfigProvider.get[JdbcProfile]                            // get db driver via DI
 
 class WebService extends Controller {
 
-  val dbConfig = DatabaseConfigProvider.get[JdbcProfile](Play.current)     // get db driver via global lookup
-
-  val l: Logger = Logger(this.getClass())
-
-  import slick.driver.H2Driver.api._
-
-  val db = dbConfig.db
+  val l: Logger = Logger(this.getClass)
 
   implicit val videoDataDir: String = "videos"
+
+  // get db driver via global lookup
+  val dbConfig: DatabaseConfig[JdbcProfile] = DatabaseConfigProvider.get[JdbcProfile](Play.current)
+  val dao = new Dao(dbConfig.db)
 
 
   // route:   GET     /ping
@@ -48,9 +126,7 @@ class WebService extends Controller {
 
     l.debug("findAll()")
 
-    db.run {
-      TableQuery[Videos].result
-    }.map(videoSeq => Ok(Json.toJson(videoSeq.toList)))
+    dao.queryAllVideos.map(videoSeq => Ok(Json.toJson(videoSeq.toList)))
   }
 
 
@@ -59,7 +135,7 @@ class WebService extends Controller {
 
     l.debug("findById(id = " + id + ")")
 
-    dbQueryVideoById(id).map { _ match {
+    dao.queryVideoById(id).map { _ match {
         case None => NotFound("Video with id " + id + " not found.")
         case Some(video) => Ok(Json.toJson(video))
       }
@@ -72,9 +148,7 @@ class WebService extends Controller {
 
     l.debug("deleteById(id = " + id + ")")
 
-    db.run{
-      TableQuery[Videos].filter(_.id === id).delete
-    }.map { nRows =>
+    dao.deleteVideoById(id).map { nRows =>
       if (nRows < 1)
         NotFound("Video with id " + id + " not found.")
       else
@@ -139,26 +213,12 @@ class WebService extends Controller {
             l.debug("addVideo(): Video data has content-type: " + contentType)
             l.debug("addVideo(): Video data saved to temp file: " + filename)
 
-            val json: JsValue = Json.parse(metaData)
-            val vNew: Video = json.as[Video]
+            val newVideo: Video = Json.parse(metaData).as[Video]
 
-/*
-            // This solution works, but should be avoided
-            // as it blocks the current thread with Await.result().
-            Future {
-              val vStored: Video = Await.result(insert(vNew), Duration.Inf) // now the inserted video has a new generated id
-              val vForUpdate: Video = updatedVideo(vStored, contentType, request) // add contentType and url
-              val vForUpdate2: Video = moveTmpFileToPermanentLocation(vForUpdate, ref) // update video with added properties in db
-              val vUpdated = Await.result(update(vForUpdate2), Duration.Inf)
-              Ok(Json.toJson(vUpdated))
-            }
-*/
-
-            // This solution doesn't block the current thread.
-            dbInsert(vNew)
+            dao.insertVideo(newVideo)
               .map(updatedVideo(_, contentType, request))
               .map(moveTmpFileToPermanentLocation(_, ref))
-              .flatMap(dbUpdate(_))
+              .flatMap(v => dao.updateVideo(v))
               .map { v =>
                 l.debug("addVideo(): new video stored in db: " + v)
                 Ok(Json.toJson(v))
@@ -188,29 +248,13 @@ class WebService extends Controller {
       java.nio.file.Files.createDirectories(path)
   }
 
-  private def dbInsert(video: Video): Future[Video] = {
-    val videos = TableQuery[Videos]
-    for {
-      id <- db.run((videos returning videos.map(_.id)) += video)
-      vs <- db.run(videos.filter(_.id === id).result).map(_.toList)
-    } yield vs.head
-  }
-
-  private def dbUpdate(v: Video): Future[Video] = {
-    db.run(
-      TableQuery[Videos].filter(_.id === v.id).update(v)
-        andThen
-        TableQuery[Videos].filter(_.id === v.id).result
-    ) map { vSeq => vSeq.head }
-  }
-
 
   // route:   GET     /video/:id/data
   def getVideoData(id: Long) = Action.async {
 
     l.debug("getVideoData(id = " + id + ")")
 
-    dbQueryVideoById(id).map { videoOpt =>
+    dao.queryVideoById(id).map { videoOpt =>
       sendFileResult(id, videoOpt)
     }
   }
@@ -248,45 +292,21 @@ class WebService extends Controller {
 
     l.debug("addVideoRating(id = " + id + ", stars = " + stars + ")")
 
-    dbQueryVideoById(id).flatMap { videoOpt =>
+    dao.queryVideoById(id).flatMap { videoOpt =>
       doAddVideoRating(id, stars, videoOpt)
     }
   }
 
   private def doAddVideoRating(id: Long, stars: Int, videoOption: Option[Video]): Future[Result] = {
-
     videoOption match {
-
       case None =>
         l.debug("getVideoData(): Video with id " + id + " doesn't exist.")
         Future {
           NotFound("Video with id " + id + " doesn't exist.")
         }
-
       case Some(video) =>
-        updateVideoRatingById(video.id, video.owner, stars)
+        dao.updateRatingByVideoId(video.id, video.owner, stars)
           .map { r => Ok(Json.toJson(r)) }
-    }
-  }
-
-  private def updateVideoRatingById(videoId: Long, user: String, stars: Int): Future[AverageVideoRating] = {
-
-    db.run {
-
-      // try to update existing row
-      TableQuery[UserVideoRatings]
-        .filter(r => r.videoId === videoId && r.user === user)
-        .update(UserVideoRating(videoId, stars, user))
-
-    }.flatMap { nRows =>
-
-        if (nRows > 0)    // no row was updated
-          Future(nRows)     // return the number of updated rows
-        else        // perform insert if no update was performed
-          db.run( TableQuery[UserVideoRatings] += new UserVideoRating(videoId, stars, user) )     // return the number of inserted rows
-
-    }.flatMap { whatever =>
-      averageVideoRating(videoId)
     }
   }
 
@@ -296,41 +316,22 @@ class WebService extends Controller {
 
     l.debug("getVideoRating(id = " + id + ")")
 
-    dbQueryVideoById(id).flatMap { videoOpt =>
+    dao.queryVideoById(id).flatMap { videoOpt =>
       doGetVideoRating(id, videoOpt)
     }
   }
 
-  def dbQueryVideoById(id: Long): Future[Option[Video]] = {
-    db.run {
-      TableQuery[Videos].filter(_.id === id).result
-    }.map {
-      videoSeq => videoSeq.toList.headOption
-    }
-  }
-
   private def doGetVideoRating(id: Long, videoOpt: Option[Video]): Future[Result] = {
-
     videoOpt match {
-
       case None =>
         l.debug("getVideoData(): Video with id " + id + " doesn't exist.")
         Future {
           NotFound("Video with id " + id + " doesn't exist.")
         }
-
       case Some(video) =>
-        averageVideoRating(video.id)
+        dao.queryRatingByVideoId(video.id)
           .map(r => Ok(Json.toJson(r)))
     }
-  }
-
-  private def averageVideoRating(videoId: Long): Future[AverageVideoRating] = {
-
-    for {
-      avgRating <- db.run( TableQuery[UserVideoRatings].filter(_.videoId === videoId).map(r => r.rating).avg.result )
-      totalRatings <- db.run( TableQuery[UserVideoRatings].filter(_.videoId === videoId).length.result )
-    } yield AverageVideoRating(videoId, avgRating.getOrElse(-1.0), totalRatings)
   }
 }
 
