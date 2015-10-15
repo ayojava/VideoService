@@ -115,7 +115,7 @@ class WebService extends Controller {
   val dao = new Dao(dbConfig.db)
 
 
-  // route:   GET     /ping
+  ////////////  route:   GET     /ping
   def ping = Action {
 
     l.debug("ping()")
@@ -124,7 +124,7 @@ class WebService extends Controller {
   }
 
 
-  // route:   GET     /video/
+  ////////////  route:   GET     /video/
   def findAll = Action.async {
 
     l.debug("findAll()")
@@ -133,7 +133,7 @@ class WebService extends Controller {
   }
 
 
-  // route:   GET     /video/:id
+  ////////////  route:   GET     /video/:id
   def findById(id: Long) = Action.async {
 
     l.debug("findById(id = " + id + ")")
@@ -145,7 +145,7 @@ class WebService extends Controller {
   }
 
 
-  // route:   DELETE  /video/:id
+  ////////////  route:   DELETE  /video/:id
   def deleteById(id: Long) = Action.async {
 
     l.debug("deleteById(id = " + id + ")")
@@ -159,7 +159,7 @@ class WebService extends Controller {
   }
 
 /*
-  // route:   GET     /video/:id
+  ////////////  route:   GET     /video/:id
   def addVideoMetaData() = Action.async(BodyParsers.parse.json) { request =>
 
     l.debug("addVideo()")
@@ -180,8 +180,8 @@ class WebService extends Controller {
 */
 
 
-  // route:   POST    /video
-  def addVideo() = Action.async(BodyParsers.parse.multipartFormData) { request =>
+  ////////////  route:   POST    /video
+  def addVideo() = Action.async(BodyParsers.parse.multipartFormData) { implicit request =>
 
     l.debug("addVideo(): Got multipart formdata")
 
@@ -218,7 +218,7 @@ class WebService extends Controller {
             val newVideo: Video = Json.parse(metaData).as[Video]
 
             dao.insertVideo(newVideo)
-              .map(updatedVideo(_, contentType, request))
+              .map(updatedVideo(_, contentType))
               .map(moveTmpFileToPermanentLocation(_, ref))
               .flatMap(v => dao.updateVideo(v))
               .map { v =>
@@ -229,7 +229,7 @@ class WebService extends Controller {
     }
   }
 
-  private def updatedVideo(v: Video, contentType: String, request: Request[MultipartFormData[TemporaryFile]]): Video =
+  private def updatedVideo(v: Video, contentType: String)(implicit request: Request[MultipartFormData[TemporaryFile]]): Video =
     new Video(v.id, v.owner, v.title, v.duration, contentType, urlFor(request, v.id))
 
   private def urlFor(request: Request[MultipartFormData[TemporaryFile]], id: Long): String =
@@ -251,75 +251,81 @@ class WebService extends Controller {
   }
 
 
-  // route:   GET     /video/:id/data
+  ////////////  route:   GET     /video/:id/data
   def getVideoData(id: Long) = Action.async {
 
     l.debug("getVideoData(id = " + id + ")")
 
     dao.queryVideoById(id).map { videoOpt =>
-      sendFileResult(id, videoOpt)
+/*
+      if (videoOpt.isEmpty)
+        notFound("Video with id " + id + " not found.")
+      else
+        sendFileResult(id, videoOpt.get)
+*/
+      videoOpt.fold(
+        notFound("Video with id " + id + " not found.")
+      )(
+        video => sendFileResult(id, video)
+      )
     }
   }
 
-  def sendFileResult(id: Long, videoOption: Option[Video]): Result = {
-    videoOption match {
-      case None => notFound("Video with id " + id + " not found.")
-      case Some(video) =>
-        if (!existsDataFile(video)) {
-          notFound("No data found for video with id " + id)
-        } else {
-          /*
+  private def sendFileResult(id: Long, video: Video): Result = {
+    if (!existsDataFile(video)) {
+      notFound("No data found for video with id " + id)
+    } else {
+      /*
                       Result(
                         header = ResponseHeader(200),
                         body = play.api.libs.iteratee.Enumerator.fromFile(new File(video.dataPath))
                       ).withHeaders("Content-Type" -> "video/mp4")
             */
-          Ok.sendFile(new File(video.dataPath))
-        }
+      Ok.sendFile(new File(video.dataPath))
     }
   }
 
   private def existsDataFile(video: Video) = java.nio.file.Files.exists(new File(video.dataPath).toPath)
 
 
-  // route:   POST    /video/:id/rating/:stars
+  ////////////  route:   POST    /video/:id/rating/:stars
   def addVideoRating(id: Long, stars: Int) = Action.async {
 
     l.debug("addVideoRating(id = " + id + ", stars = " + stars + ")")
 
     dao.queryVideoById(id).flatMap { videoOpt =>
-      doAddVideoRating(id, stars, videoOpt)
-    }
-  }
-
-  private def doAddVideoRating(id: Long, stars: Int, videoOption: Option[Video]): Future[Result] = {
-    videoOption match {
-      case None => fNotFound("Video with id " + id + " not found.")
-      case Some(video) =>
-        dao.updateRatingByVideoId(video.id, video.owner, stars)
+/*
+      if (videoOpt.isEmpty) {
+        fNotFound("Video with id " + id + " not found.")
+      } else {
+        dao.updateRatingByVideoId(videoOpt.get.id, videoOpt.get.owner, stars)
           .map { r => Ok(Json.toJson(r)) }
+      }
+*/
+      videoOpt.fold(
+        fNotFound("Video with id " + id + " not found.")
+      )(video => {
+          dao.updateRatingByVideoId(video.id, video.owner, stars)
+            .map { r => Ok(Json.toJson(r)) }
+        })
     }
   }
 
-
-  // route:   GET     /video/:id/rating
+  ////////////  route:   GET     /video/:id/rating
   def getVideoRating(id: Long) = Action.async {
 
     l.debug("getVideoRating(id = " + id + ")")
 
     dao.queryVideoById(id).flatMap { videoOpt =>
-      doGetVideoRating(id, videoOpt)
+      videoOpt.fold(
+        fNotFound("Video with id " + id + " not found.")
+      )(video => {
+        dao.queryRatingByVideoId(video.id)
+          .map { r => Ok(Json.toJson(r)) }
+      })
     }
   }
 
-  private def doGetVideoRating(id: Long, videoOpt: Option[Video]): Future[Result] = {
-    videoOpt match {
-      case None => fNotFound("Video with id " + id + " not found.")
-      case Some(video) =>
-        dao.queryRatingByVideoId(video.id)
-          .map(r => Ok(Json.toJson(r)))
-    }
-  }
 
   def fNotFound(msg: String): Future[Result] = {
     l.debug(msg)
