@@ -4,7 +4,7 @@
 
 # Home page
 GET     /                           videosvc.controllers.WebApplication.index()
-GET     /videoApp                   videosvc.controllers.WebApplication.app()
+GET     /videoApp                   videosvc.controllers.WebApplication.videoApp()
 
 GET     /ping                       videosvc.controllers.WebService.ping()
 GET     /video                      videosvc.controllers.WebService.findAll()

@@ -18,7 +18,7 @@
   <logger name="videosvc.controllers.WebService" level="INFO" />
   <logger name="videosvc.controllers.WebApplication" level="INFO" />
   <logger name="videosvc.Global" level="INFO" />
-  <logger name="videosvc.test.WebApplicationSpec" level="INFO" />
+  <logger name="videosvc.test.WebApplicationSpec" level="DEBUG" />
   <logger name="videosvc.test.WebServiceSpec" level="INFO" />
   <logger name="videosvc.test.WithServerSpec" level="INFO" />
 

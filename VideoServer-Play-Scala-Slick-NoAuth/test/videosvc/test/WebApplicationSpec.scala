@@ -19,9 +19,10 @@ class WebApplicationSpec extends PlaySpecification {
 
   "WebApplication" should {
 
-    "send 404 on a bad request" in new WithApplication {
 
-      l.debug("(in Test 1) send 404 on a bad request")
+    "(in Test 1) send 404 on a bad request" in new WithApplication {
+
+      l.debug("send 404 on a bad request")
 
       val ofResult = route(FakeRequest(GET, "/boum"))
 
@@ -32,9 +33,10 @@ class WebApplicationSpec extends PlaySpecification {
       ofResult must beSome.which (status(_) == NOT_FOUND)
     }
 
-    "redirect to /videoApp" in new WithApplication {
 
-      l.debug("(in Test 2) redirect to /videoApp")
+    "(in Test 2) redirect to /videoApp" in new WithApplication {
+
+      l.debug("redirect to /videoApp")
 
       val fResult = route(FakeRequest(GET, "/")).get
 
@@ -44,9 +46,9 @@ class WebApplicationSpec extends PlaySpecification {
       status(fResult) must equalTo(SEE_OTHER)
     }
 
-    "render the TODO page" in new WithApplication {
+    "(in Test 3) render the TODO page" in new WithApplication {
 
-      l.debug("(in Test 3) render the TODO page")
+      l.debug("render the TODO page")
 
       val fResult = route(FakeRequest(GET, "/videoApp")).get
 
