@@ -16,6 +16,8 @@ public class IntegrationTest {
 
     private static final Logger.ALogger l = Logger.of(IntegrationTest.class);
 
+    private static int serverPort = 3332;
+
 
     @BeforeClass
     public static void beforeClass() {
@@ -45,11 +47,11 @@ public class IntegrationTest {
 
         l.info("---> test()");
 
-        running(testServer(3333, fakeApplication(inMemoryDatabase())), HTMLUNIT, new Callback<TestBrowser>() {
+        running(testServer(serverPort, fakeApplication(inMemoryDatabase())), HTMLUNIT, new Callback<TestBrowser>() {
 
             public void invoke(TestBrowser browser) {
 
-                browser.goTo("http://localhost:3333");
+                browser.goTo("http://localhost:" + serverPort);
 
                 assertTrue(browser.pageSource().contains("TODO"));
                 assertTrue(browser.pageSource().contains("Action not implemented yet"));
