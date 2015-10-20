@@ -14,6 +14,13 @@ public class WebApplication extends Controller {
 
         l.debug("index()");
 
-        return ok(index.render("Your new application is ready."));
+        return redirect(routes.WebApplication.videoApp());
+    }
+
+    public Result videoApp() {
+
+        l.debug("videoApp()");
+
+        return TODO;
     }
 }

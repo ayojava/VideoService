@@ -29,7 +29,6 @@ class WebApplicationSpec extends PlaySpecification {
       l.debug("headers = [[" + await(ofResult.get).toString() + "]]")
       // l.debug("contentAsString = [[" + contentAsString(fResult) + "]]")
 
-
       ofResult must beSome.which (status(_) == NOT_FOUND)
     }
 
@@ -57,6 +56,7 @@ class WebApplicationSpec extends PlaySpecification {
 
       status(fResult) must equalTo(NOT_IMPLEMENTED)
       contentType(fResult) must beSome.which(_ == "text/html")
+      charset(fResult) must beSome.which(_ == "utf-8")
       contentAsString(fResult) must contain ("TODO")
       contentAsString(fResult) must contain ("Action not implemented yet")
     }
