@@ -1,4 +1,4 @@
-name := """VideoServer-Play-Scala-Slick-NoAuth"""
+name := """VideoService-Play-Scala-Slick-NoAuth"""
 
 version := "1.0-SNAPSHOT"
 

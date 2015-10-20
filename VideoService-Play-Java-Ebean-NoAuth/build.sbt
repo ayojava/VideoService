@@ -1,4 +1,4 @@
-name := """VideoServer-Play-Java-Ebean-NoAuth"""
+name := """VideoService-Play-Java-Ebean-NoAuth"""
 
 version := "1.0-SNAPSHOT"
 
