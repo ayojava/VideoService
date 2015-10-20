@@ -22,6 +22,7 @@ build/
 /.project
 /.settings
 /RUNNING_PID
+/projectFilesBackup*
 
 logs
 target/
