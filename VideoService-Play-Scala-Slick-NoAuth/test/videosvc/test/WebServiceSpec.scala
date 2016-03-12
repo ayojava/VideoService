@@ -308,7 +308,7 @@ class WebServiceSpec extends Specification with BeforeAfter with BeforeAfterEach
   }
 
 
-  "(in Test 8) succeed to add and retieve video ratings" in new WithApplication {
+  "(in Test 8) succeed to add and retrieve video ratings" in new WithApplication {
 
     l.debug("---> Testing Actions addVideoRating() and getVideoRating() for existing video")
 

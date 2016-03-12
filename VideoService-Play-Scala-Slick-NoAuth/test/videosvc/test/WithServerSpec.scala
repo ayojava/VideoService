@@ -56,12 +56,13 @@ class WithServerSpec extends PlaySpecification with Results with BeforeAfter wit
   }
 
 
-  "Video WebService running at " + videoUrl should {
+  "WebService running at " + videoUrl should {
 
 
     "(in Test 1) satisfy all requirements within one test" in new WithServer(port = testPort) {
 
       l.debug("---> Testing the App by invoking the server's external WebService interface")
+
       var videoToAdd: Video = new Video(-1L, "Bob", "Video of Bob 1", 10L, "", "")
       var videoDataFile: String = "testVideos/video1.mp4"
       l.debug("videoToAdd = " + videoToAdd)
@@ -292,7 +293,7 @@ class WithServerSpec extends PlaySpecification with Results with BeforeAfter wit
   private def isCorrectVideo(video: Video, compareVideo: Video): Boolean = {
     l.debug("isCorrectVideo(): video = " + video)
     l.debug("isCorrectVideo(): compareVideo = " + compareVideo)
-    return  video.id > 0 &&
+    video.id > 0 &&
             video.owner != null &&
             video.owner == compareVideo.owner &&
             video.title != null &&

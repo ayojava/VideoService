@@ -19,7 +19,7 @@ import scala.concurrent.Future
 
 import slick.driver.H2Driver.api._
 
-class Dao(val db: BasicProfile#Backend#Database) {
+class Repo(val db: BasicProfile#Backend#Database) {
 
   def queryAllVideos: Future[Seq[Video]] = {
     db.run {
@@ -112,7 +112,7 @@ class WebService extends Controller {
 
   // get db driver via global lookup
   val dbConfig: DatabaseConfig[JdbcProfile] = DatabaseConfigProvider.get[JdbcProfile](Play.current)
-  val dao = new Dao(dbConfig.db)
+  val repo = new Repo(dbConfig.db)
 
 
   ////////////  route:   GET     /ping
@@ -129,7 +129,7 @@ class WebService extends Controller {
 
     l.debug("findAll()")
 
-    dao.queryAllVideos.map(videoSeq => Ok(Json.toJson(videoSeq.toList)))
+    repo.queryAllVideos.map(videoSeq => Ok(Json.toJson(videoSeq.toList)))
   }
 
 
@@ -138,7 +138,7 @@ class WebService extends Controller {
 
     l.debug("findById(id = " + id + ")")
 
-    dao.queryVideoById(id).map {
+    repo.queryVideoById(id).map {
         case None => notFound("Video with id " + id + " not found.")
         case Some(video) => Ok(Json.toJson(video))
     }
@@ -150,12 +150,20 @@ class WebService extends Controller {
 
     l.debug("deleteById(id = " + id + ")")
 
-    dao.deleteVideoById(id).map { nRows =>
-      if (nRows < 1)
+    repo.deleteVideoById(id).map { nRows =>
+      if (nRows < 1) {
         notFound("Video with id " + id + " not found.")
-      else
+      } else {
+        deleteFileIfExists(dataPath(id))
         Ok(Json.toJson(true))
+      }
     }
+  }
+
+  private def dataPath(id: Long): String = videoDataDir + "/" + "recording_" + id + ".mp3"
+
+  private def deleteFileIfExists(file: String): Unit = {
+    java.nio.file.Files.deleteIfExists(new File(file).toPath)
   }
 
 /*
@@ -217,10 +225,10 @@ class WebService extends Controller {
 
             val newVideo: Video = Json.parse(metaData).as[Video]
 
-            dao.insertVideo(newVideo)
+            repo.insertVideo(newVideo)
               .map(updatedVideo(_, contentType))
               .map(moveTmpFileToPermanentLocation(_, ref))
-              .flatMap(v => dao.updateVideo(v))
+              .flatMap(v => repo.updateVideo(v))
               .map { v =>
                 l.debug("addVideo(): new video stored in db: " + v)
                 Ok(Json.toJson(v))
@@ -256,7 +264,7 @@ class WebService extends Controller {
 
     l.debug("getVideoData(id = " + id + ")")
 
-    dao.queryVideoById(id).map { videoOpt =>
+    repo.queryVideoById(id).map { videoOpt =>
 /*
       if (videoOpt.isEmpty)
         notFound("Video with id " + id + " not found.")
@@ -293,7 +301,7 @@ class WebService extends Controller {
 
     l.debug("addVideoRating(id = " + id + ", stars = " + stars + ")")
 
-    dao.queryVideoById(id).flatMap { videoOpt =>
+    repo.queryVideoById(id).flatMap { videoOpt =>
 /*
       if (videoOpt.isEmpty) {
         fNotFound("Video with id " + id + " not found.")
@@ -305,7 +313,7 @@ class WebService extends Controller {
       videoOpt.fold(
         fNotFound("Video with id " + id + " not found.")
       )(video => {
-          dao.updateRatingByVideoId(video.id, video.owner, stars)
+          repo.updateRatingByVideoId(video.id, video.owner, stars)
             .map { r => Ok(Json.toJson(r)) }
         })
     }
@@ -316,11 +324,11 @@ class WebService extends Controller {
 
     l.debug("getVideoRating(id = " + id + ")")
 
-    dao.queryVideoById(id).flatMap { videoOpt =>
+    repo.queryVideoById(id).flatMap { videoOpt =>
       videoOpt.fold(
         fNotFound("Video with id " + id + " not found.")
       )(video => {
-        dao.queryRatingByVideoId(video.id)
+        repo.queryRatingByVideoId(video.id)
           .map { r => Ok(Json.toJson(r)) }
       })
     }
