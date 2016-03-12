@@ -17,7 +17,7 @@ The third project is an external test client which requires that
 you first start a VideoServer and run the tests afterwards.
 The Tests are written in Java using the Retrofit library.
 
-Each project directory contains a README-HowTo.txt which gives
+Each project directory contains a README.md which gives
 a very short intro into the respective project and explains
 how to run it, how to test it and how to import it into your IDE.
 
